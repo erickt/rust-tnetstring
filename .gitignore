@@ -1,0 +1,6 @@
+*.sw[po]
+*.dylib
+*.so
+*.dll
+*.dSYM
+tnetstrings
