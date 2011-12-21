@@ -8,6 +8,13 @@ import std::rand;
 export t;
 export to_str;
 export from_str;
+export str;
+export int;
+export float;
+export bool;
+export null;
+export map;
+export vec;
 
 /*
 Tag: t
