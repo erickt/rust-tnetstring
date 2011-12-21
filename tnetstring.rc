@@ -1,4 +1,4 @@
-#[link(name = "tnetstrings",
+#[link(name = "tnetstring",
        vers = "0.1",
        uuid = "ce93b70c-c22a-45fa-97a7-66ab97009005")];
 #[crate_type = "lib"];

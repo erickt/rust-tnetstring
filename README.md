@@ -5,13 +5,13 @@ serialization format.
 
 ## API
 
-    let t = tnetstrings::str("hello world");
-    let s = tnetstrings::to_str(t) // returns "11:hello world,"
+    let t = tnetstring::str("hello world");
+    let s = tnetstring::to_str(t) // returns "11:hello world,"
 
-    let (t, extra) = tnetstrings::from_str(s);
+    let (t, extra) = tnetstring::from_str(s);
     alt option::get(t) {
-      tnetstrings::str(s) { ... }
+      tnetstring::str(s) { ... }
       ...
     }
 
-See the `tests` module in `tnetstrings.rs` for more examples.
+See the `tests` module in `tnetstring.rs` for more examples.
