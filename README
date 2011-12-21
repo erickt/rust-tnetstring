@@ -1,4 +1,0 @@
-TNetStrings: Tagged Netstrings
-
-This module implements bindings for the http://tnetstring.org serialization
-format.
