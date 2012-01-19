@@ -6,6 +6,9 @@ import std::io;
 import std::map;
 import std::rand;
 
+import io::writer_util;
+import io::reader_util;
+
 export t;
 export to_writer;
 export to_bytes;
@@ -52,7 +55,7 @@ fn to_writer(writer: io::writer, t: t) {
     alt t {
         string(s) {
             writer.write_str(#fmt("%u:", vec::len(s)));
-            writer.write_bytes(s);
+            writer.write(s);
             writer.write_char(',');
         }
         integer(i) {
@@ -68,22 +71,24 @@ fn to_writer(writer: io::writer, t: t) {
             writer.write_str(#fmt("%u:%s!", str::byte_len(s), s));
         }
         map(m) {
-            let wr = io::bytes_writer();
+            let buf = io::mk_mem_buffer();
+            let wr = io::mem_buffer_writer(buf);
             m.items({ |key, value|
-                to_writer(wr.get_writer(), string(key));
-                to_writer(wr.get_writer(), value);
+                to_writer(wr, string(key));
+                to_writer(wr, value);
             });
-            let payload = wr.get_bytes();
+            let payload = io::mem_buffer_buf(buf);
             writer.write_str(#fmt("%u:", vec::len(payload)));
-            writer.write_bytes(payload);
+            writer.write(payload);
             writer.write_char('}');
         }
         list(@l) {
-            let wr = io::bytes_writer();
-            vec::iter(l, {|e| to_writer(wr.get_writer(), e) });
-            let payload = wr.get_bytes();
+            let buf = io::mk_mem_buffer();
+            let wr = io::mem_buffer_writer(buf);
+            vec::iter(l, {|e| to_writer(wr, e) });
+            let payload = io::mem_buffer_buf(buf);
             writer.write_str(#fmt("%u:", vec::len(payload)));
-            writer.write_bytes(payload);
+            writer.write(payload);
             writer.write_char(']');
         }
         null {
@@ -98,9 +103,10 @@ Function: to_bytes
 Serializes a tnetstring value into a byte string.
 */
 fn to_bytes(t: t) -> [const u8] {
-    let writer = io::bytes_writer();
-    to_writer(writer.get_writer(), t);
-    writer.get_bytes()
+    let buf = io::mk_mem_buffer();
+    let wr = io::mem_buffer_writer(buf);
+    to_writer(wr, t);
+    io::mem_buffer_buf(buf)
 }
 
 /*
@@ -109,9 +115,10 @@ Function: to_str
 Serializes a tnetstring value into a string.
 */
 fn to_str(t: t) -> str {
-    let writer = io::string_writer();
-    to_writer(writer.get_writer(), t);
-    writer.get_str()
+    let buf = io::mk_mem_buffer();
+    let wr = io::mem_buffer_writer(buf);
+    to_writer(wr, t);
+    io::mem_buffer_str(buf)
 }
 
 /*
