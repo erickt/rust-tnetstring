@@ -29,21 +29,21 @@ Tag: t
 
 Represents a tnetstring value.
 */
-tag t {
+enum t {
     /* Variant: string */
-    string([u8]);
+    string([u8]),
     /* Variant: integer */
-    integer(int);
+    integer(int),
     /* Variant: floating */
-    floating(float);
+    floating(float),
     /* Variant: boolean */
-    boolean(bool);
+    boolean(bool),
     /* Variant: null */
-    null;
+    null,
     /* Variant: map */
-    map(map::hashmap<[u8], t>);
+    map(map::hashmap<[u8], t>),
     /* Variant: list */
-    list(@[t]);
+    list(@[t]),
 }
 
 /*
@@ -102,7 +102,7 @@ Function: to_bytes
 
 Serializes a tnetstring value into a byte string.
 */
-fn to_bytes(t: t) -> [const u8] {
+fn to_bytes(t: t) -> [u8] {
     let buf = io::mk_mem_buffer();
     let wr = io::mem_buffer_writer(buf);
     to_writer(wr, t);
@@ -271,7 +271,7 @@ fn eq(t0: t, t1: t) -> bool {
         (integer(i0), integer(i1)) { i0 == i1 }
         (floating(f0), floating(f1)) { f0 == f1 }
         (boolean(b0), boolean(b1)) { b0 == b1 }
-        (null., null.) { true }
+        (null, null) { true }
         (map(d0), map(d1)) {
             if d0.size() == d1.size() {
                 let equal = true;
