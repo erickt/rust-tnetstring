@@ -167,17 +167,20 @@ fn from_reader(reader: io::reader) -> option::t<t> {
 
     alt reader.read_byte() as char {
         '#' {
-            let v = int::from_str(str::unsafe_from_bytes(payload));
+            let s = unsafe { str::unsafe::from_bytes(payload) };
+            let v = int::from_str(s);
             some(integer(v))
         }
         '}' { some(map(parse_map(payload))) }
         ']' { some(list(parse_list(payload))) }
         '!' {
-            let v = bool::from_str(str::unsafe_from_bytes(payload));
+            let s = unsafe { str::unsafe::from_bytes(payload) };
+            let v = bool::from_str(s);
             some(boolean(v))
         }
         '^' {
-            let v = float::from_str(str::unsafe_from_bytes(payload));
+            let s = unsafe { str::unsafe::from_bytes(payload) };
+            let v = float::from_str(s);
             some(floating(v))
         }
         '~' {
@@ -262,7 +265,8 @@ Deserializes a tnetstring value from a string.
 fn from_str(data: str) -> (option::t<t>, str) {
     let reader = io::string_reader(data);
     let tnetstring = from_reader(reader);
-    (tnetstring, str::unsafe_from_bytes(reader.read_whole_stream()))
+    (tnetstring, unsafe { str::unsafe::from_bytes(reader.read_whole_stream()) })
+
 }
 
 fn eq(t0: t, t1: t) -> bool {
@@ -367,9 +371,9 @@ mod tests {
             if randint(rng, depth, 10u32) <= 4u32 {
                 if randint(rng, 0u32, 1u32) == 0u32 {
                     let n = randint(rng, 0u32, 10u32);
-                    list(@vec::init_fn(
-                        { |_i| get_random_object(rng, depth + 1u32) },
-                        n as uint))
+                    list(@vec::init_fn(n as uint) { |_i|
+                        get_random_object(rng, depth + 1u32)
+                    })
                 } else {
                     let d = map::new_bytes_hash();
 
@@ -424,8 +428,10 @@ mod tests {
         while i != 0u {
             let v0 = get_random_object(rng, 0u32);
             
-            alt from_str(to_str(v0)) {
-                (some(v1), "") { assert eq(v0, v1); }
+            alt from_bytes(to_bytes(v0)) {
+                (some(v1), rest) if rest == [] {
+                    assert eq(v0, v1);
+                }
                 _ { fail; }
             }
             i -= 1u;
