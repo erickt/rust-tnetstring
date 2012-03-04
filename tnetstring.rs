@@ -1,4 +1,4 @@
-// Rust TNetStrings serialization library.
+#[doc = "Rust TNetStrings serialization library."];
 
 use std;
 import option::{some, none};
@@ -24,33 +24,25 @@ export null;
 export map;
 export list;
 
-/*
-Tag: t
-
-Represents a tnetstring value.
-*/
+#[doc = "Represents a tnetstring value."]
 enum t {
-    /* Variant: string */
+    #[doc = "string"]
     string([u8]),
-    /* Variant: integer */
+    #[doc = "integer"]
     integer(int),
-    /* Variant: floating */
+    #[doc = "floating"]
     floating(float),
-    /* Variant: boolean */
+    #[doc = "boolean"]
     boolean(bool),
-    /* Variant: null */
+    #[doc = "null"]
     null,
-    /* Variant: map */
+    #[doc = "map"]
     map(map::hashmap<[u8], t>),
-    /* Variant: list */
+    #[doc = "list"]
     list(@[t]),
 }
 
-/*
-Function: to_writer
-
-Serializes a tnetstring value into a io::writer.
-*/
+#[doc = "Serializes a tnetstring value into a io::writer."]
 fn to_writer(writer: io::writer, t: t) {
     alt t {
         string(s) {
@@ -97,11 +89,7 @@ fn to_writer(writer: io::writer, t: t) {
     }
 }
 
-/*
-Function: to_bytes
-
-Serializes a tnetstring value into a byte string.
-*/
+#[doc = "Serializes a tnetstring value into a byte string."]
 fn to_bytes(t: t) -> [u8] {
     let buf = io::mk_mem_buffer();
     let wr = io::mem_buffer_writer(buf);
@@ -109,11 +97,7 @@ fn to_bytes(t: t) -> [u8] {
     io::mem_buffer_buf(buf)
 }
 
-/*
-Function: to_str
-
-Serializes a tnetstring value into a string.
-*/
+#[doc = "Serializes a tnetstring value into a string."]
 fn to_str(t: t) -> str {
     let buf = io::mk_mem_buffer();
     let wr = io::mem_buffer_writer(buf);
@@ -121,11 +105,7 @@ fn to_str(t: t) -> str {
     io::mem_buffer_str(buf)
 }
 
-/*
-Function: from_reader
-
-Deserializes a tnetstring value from an io::reader.
-*/
+#[doc = "Deserializes a tnetstring value from an io::reader."]
 fn from_reader(reader: io::reader) -> option::t<t> {
     assert !reader.eof();
 
@@ -246,22 +226,14 @@ fn parse_map(data: [u8]) -> map::hashmap<[u8], t> {
     ret result;
 }
 
-/*
-Function: from_bytes
-
-Deserializes a tnetstring value from a byte string.
-*/
+#[doc = "Deserializes a tnetstring value from a byte string."]
 fn from_bytes(data: [u8]) -> (option::t<t>, [u8]) {
     let reader = io::bytes_reader(data);
     let tnetstring = from_reader(reader);
     (tnetstring, reader.read_whole_stream())
 }
 
-/*
-Function: from_str
-
-Deserializes a tnetstring value from a string.
-*/
+#[doc = "Deserializes a tnetstring value from a string."]
 fn from_str(data: str) -> (option::t<t>, str) {
     let reader = io::string_reader(data);
     let tnetstring = from_reader(reader);
@@ -269,6 +241,7 @@ fn from_str(data: str) -> (option::t<t>, str) {
 
 }
 
+#[doc = "Test the equality between two tnetstring values"]
 fn eq(t0: t, t1: t) -> bool {
     alt (t0, t1) {
         (string(s0), string(s1)) { s0 == s1 }
