@@ -2,8 +2,8 @@
 
 use std;
 import option::{some, none};
-import std::io;
 import std::map;
+import std::map::hashmap;
 import std::rand;
 
 import io::writer_util;
@@ -63,7 +63,7 @@ fn to_writer(writer: io::writer, t: t) {
             writer.write_str(#fmt("%u:%s!", str::len(s), s));
         }
         map(m) {
-            let buf = io::mk_mem_buffer();
+            let buf = io::mem_buffer();
             let wr = io::mem_buffer_writer(buf);
             m.items({ |key, value|
                 to_writer(wr, str(key));
@@ -75,7 +75,7 @@ fn to_writer(writer: io::writer, t: t) {
             writer.write_char('}');
         }
         vec(l) {
-            let buf = io::mk_mem_buffer();
+            let buf = io::mem_buffer();
             let wr = io::mem_buffer_writer(buf);
             vec::iter(l, {|e| to_writer(wr, e) });
             let payload = io::mem_buffer_buf(buf);
@@ -91,7 +91,7 @@ fn to_writer(writer: io::writer, t: t) {
 
 #[doc = "Serializes a tnetstring value into a byte string."]
 fn to_bytes(t: t) -> [u8] {
-    let buf = io::mk_mem_buffer();
+    let buf = io::mem_buffer();
     let wr = io::mem_buffer_writer(buf);
     to_writer(wr, t);
     io::mem_buffer_buf(buf)
@@ -99,7 +99,7 @@ fn to_bytes(t: t) -> [u8] {
 
 #[doc = "Serializes a tnetstring value into a string."]
 fn to_str(t: t) -> str {
-    let buf = io::mk_mem_buffer();
+    let buf = io::mem_buffer();
     let wr = io::mem_buffer_writer(buf);
     to_writer(wr, t);
     io::mem_buffer_str(buf)
@@ -343,7 +343,7 @@ mod tests {
             if randint(rng, depth, 10u32) <= 4u32 {
                 if randint(rng, 0u32, 1u32) == 0u32 {
                     let n = randint(rng, 0u32, 10u32);
-                    vec(vec::init_fn(n as uint) { |_i|
+                    vec(vec::from_fn(n as uint) { |_i|
                         get_random_object(rng, depth + 1u32)
                     })
                 } else {
@@ -398,7 +398,7 @@ mod tests {
             }
         }
 
-        let rng = rand::mk_rng();
+        let rng = rand::rng();
 
         let i = 500u;
         while i != 0u {
