@@ -109,8 +109,8 @@ fn to_str(t: t) -> str {
 fn from_reader(reader: io::reader) -> option<t> {
     assert !reader.eof();
 
-    let c = reader.read_byte();
-    let len = 0u;
+    let mut c = reader.read_byte();
+    let mut len = 0u;
 
     // Note that netstring spec explicitly forbids padding zeros.
     // If the first char is zero, it must be the only char.
@@ -179,7 +179,7 @@ fn parse_vec(data: [u8]) -> [t] {
 
     let value = from_reader(reader);
     assert option::is_some(value);
-    let result = [option::get(value)];
+    let mut result = [option::get(value)];
 
     while !reader.eof() {
         let value = from_reader(reader);
@@ -207,12 +207,12 @@ fn parse_pair(reader: io::reader) -> ([u8], t) {
 }
 
 fn parse_map(data: [u8]) -> map::hashmap<[u8], t> {
-    if vec::len(data) == 0u { ret map::new_bytes_hash(); }
+    if vec::len(data) == 0u { ret map::bytes_hash(); }
 
     let reader = io::bytes_reader(data);
     let (key, value) = parse_pair(reader);
 
-    let result = map::new_bytes_hash();
+    let result = map::bytes_hash();
     result.insert(key, value);
 
     while !reader.eof() {
@@ -250,7 +250,7 @@ fn eq(t0: t, t1: t) -> bool {
         (null, null) { true }
         (map(d0), map(d1)) {
             if d0.size() == d1.size() {
-                let equal = true;
+                let mut equal = true;
                 d0.items() { |k, v|
                     if !d1.contains_key(k) || !eq(d1.get(k), v) {
                         equal = false;
@@ -285,10 +285,10 @@ mod tests {
     #[test]
     fn test_format() {
         test("11:hello world,", str(str::bytes("hello world")));
-        test("0:}", map(map::new_bytes_hash()));
+        test("0:}", map(map::bytes_hash()));
         test("0:]", vec([]));
 
-        let d = map::new_bytes_hash();
+        let d = map::bytes_hash();
         d.insert(str::bytes("hello"),
                 vec([
                     int(12345678901),
@@ -347,9 +347,9 @@ mod tests {
                         get_random_object(rng, depth + 1u32)
                     })
                 } else {
-                    let d = map::new_bytes_hash();
+                    let d = map::bytes_hash();
 
-                    let i = randint(rng, 0u32, 10u32);
+                    let mut i = randint(rng, 0u32, 10u32);
                     while i != 0u32 {
                         let s = rng.gen_bytes(randint(rng, 0u32, 100u32) as uint);
                         d.insert(s, get_random_object(rng, depth + 1u32));
@@ -370,7 +370,7 @@ mod tests {
                     }
                   }
                   4u32 {
-                    let f = rng.next_float();
+                    let mut f = rng.next_float();
 
                     // Generate a float that can be exactly converted to
                     // and from a string.
@@ -400,7 +400,7 @@ mod tests {
 
         let rng = rand::rng();
 
-        let i = 500u;
+        let mut i = 500u;
         while i != 0u {
             let v0 = get_random_object(rng, 0u32);
             
