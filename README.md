@@ -15,3 +15,7 @@ serialization format.
     }
 
 See the `tests` module in `tnetstring.rs` for more examples.
+
+## Compatibility
+
+Use tag v0.1 with Rust 0.2.
