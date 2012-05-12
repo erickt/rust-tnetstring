@@ -119,14 +119,18 @@ fn from_reader(reader: io::reader) -> option<t> {
     } else if c == '0' as int {
         c = reader.read_byte();
     } else {
-        do {
+        loop {
             len = (10u * len) + ((c as uint) - ('0' as uint));
 
             if reader.eof() {
                 fail "Not a tnetstring: invalid or missing length prefix";
             }
             c = reader.read_byte();
-        } while c >= '0' as int && c <= '9' as int;
+
+            if c < '0' as int || c > '9' as int {
+                break;
+            }
+        }
     }
 
     // Validate end-of-length-prefix marker.
@@ -371,7 +375,7 @@ mod tests {
 
                     // Generate a float that can be exactly converted to
                     // and from a string.
-                    while true {
+                    loop {
                         alt float::from_str(float::to_str(f, 6u)) {
                           some(f1) {
                             if f == f1 { break; }
