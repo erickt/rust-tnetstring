@@ -2,3 +2,11 @@
        vers = "0.2pre",
        uuid = "ce93b70c-c22a-45fa-97a7-66ab97009005")];
 #[crate_type = "lib"];
+
+use std;
+import io::{reader_util, writer_util};
+import dvec::{dvec, extensions};
+
+import std::map;
+import std::map::hashmap;
+import std::rand;
