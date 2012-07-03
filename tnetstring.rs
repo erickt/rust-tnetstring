@@ -18,7 +18,7 @@ export from_str;
 #[doc = "Represents a tnetstring value."]
 enum tnetstring {
     #[doc = "str"]
-    str(@[u8]),
+    str(@~[u8]),
     #[doc = "int"]
     int(int),
     #[doc = "floating"]
@@ -28,14 +28,14 @@ enum tnetstring {
     #[doc = "null"]
     null,
     #[doc = "map"]
-    map(map::hashmap<[u8], tnetstring>),
+    map(map::hashmap<~[u8], tnetstring>),
     #[doc = "list"]
-    vec(@[tnetstring]),
+    vec(@~[tnetstring]),
 }
 
 #[doc = "Serializes a tnetstring value into a io::writer."]
 fn to_writer(writer: io::writer, tnetstring: tnetstring) {
-    fn write_str(wr: io::writer, s: [u8]) {
+    fn write_str(wr: io::writer, s: &[u8]) {
         wr.write_str(#fmt("%u:", s.len()));
         wr.write(s);
         wr.write_char(',');
@@ -58,7 +58,7 @@ fn to_writer(writer: io::writer, tnetstring: tnetstring) {
         map(m) {
             let buf = io::mem_buffer();
             let wr = io::mem_buffer_writer(buf);
-            for m.each { |key, value|
+            for m.each |key, value| {
                 write_str(wr, key);
                 to_writer(wr, value);
             }
@@ -70,7 +70,7 @@ fn to_writer(writer: io::writer, tnetstring: tnetstring) {
         vec(v) {
             let buf = io::mem_buffer();
             let wr = io::mem_buffer_writer(buf);
-            for (*v).each {|e| to_writer(wr, e) }
+            for v.each |e| { to_writer(wr, e) }
             let payload = io::mem_buffer_buf(buf);
             writer.write_str(#fmt("%u:", payload.len()));
             writer.write(payload);
@@ -83,7 +83,7 @@ fn to_writer(writer: io::writer, tnetstring: tnetstring) {
 }
 
 #[doc = "Serializes a tnetstring value into a byte string."]
-fn to_bytes(tnetstring: tnetstring) -> [u8] {
+fn to_bytes(tnetstring: tnetstring) -> ~[u8] {
     let buf = io::mem_buffer();
     let wr = io::mem_buffer_writer(buf);
     to_writer(wr, tnetstring);
@@ -145,17 +145,17 @@ fn from_reader(reader: io::reader) -> option<tnetstring> {
     alt reader.read_byte() as char {
       '#' {
         let s = unsafe { str::unsafe::from_bytes(payload) };
-        option::chain(int::from_str(s)) {|v| some(int(v)) }
+        int::from_str(s).map(|v| int(v))
       }
       '}' { some(map(parse_map(payload))) }
       ']' { some(vec(parse_vec(payload))) }
       '!' {
         let s = unsafe { str::unsafe::from_bytes(payload) };
-        option::chain(bool::from_str(s)) {|v| some(bool(v)) }
+        bool::from_str(s).map(|v| bool(v))
       }
       '^' {
         let s = unsafe { str::unsafe::from_bytes(payload) };
-        option::chain(float::from_str(s)) {|v| some(float(v)) }
+        float::from_str(s).map(|v| float(v))
       }
       '~' {
         assert payload.len() == 0u;
@@ -169,44 +169,44 @@ fn from_reader(reader: io::reader) -> option<tnetstring> {
     }
 }
 
-fn parse_vec(data: [u8]) -> @[tnetstring] {
-    if data.len() == 0u { ret @[]; }
+fn parse_vec(data: ~[u8]) -> @~[tnetstring] {
+    if data.len() == 0u { ret @~[]; }
 
     let reader = io::bytes_reader(data);
 
     let result = dvec();
 
     let value = from_reader(reader);
-    assert option::is_some(value);
+    assert value.is_some();
 
-    result.push(option::get(value));
+    result.push(value.get());
 
     while !reader.eof() {
         let value = from_reader(reader);
-        assert option::is_some(value);
-        result.push(option::get(value));
+        assert value.is_some();
+        result.push(value.get());
     }
 
     @vec::from_mut(dvec::unwrap(result))
 }
 
-fn parse_pair(reader: io::reader) -> (@[u8], tnetstring) {
+fn parse_pair(reader: io::reader) -> (@~[u8], tnetstring) {
     let key = from_reader(reader);
-    assert option::is_some(key);
+    assert key.is_some();
     assert !reader.eof();
 
     alt key {
       some(str(key)) {
         let value = from_reader(reader);
-        assert option::is_some(value);
+        assert value.is_some();
 
-        (key, option::get(value))
+        (key, value.get())
       }
       _ { fail "Keys can only be strings." }
     }
 }
 
-fn parse_map(data: [u8]) -> map::hashmap<[u8], tnetstring> {
+fn parse_map(data: ~[u8]) -> map::hashmap<~[u8], tnetstring> {
     if data.len() == 0u { ret map::bytes_hash(); }
 
     let reader = io::bytes_reader(data);
@@ -224,7 +224,7 @@ fn parse_map(data: [u8]) -> map::hashmap<[u8], tnetstring> {
 }
 
 #[doc = "Deserializes a tnetstring value from a byte string."]
-fn from_bytes(data: [u8]) -> (option<tnetstring>, [u8]) {
+fn from_bytes(data: ~[u8]) -> (option<tnetstring>, ~[u8]) {
     let rdr = io::bytes_reader(data);
     let tnetstring = from_reader(rdr);
     (tnetstring, rdr.read_whole_stream())
@@ -232,7 +232,7 @@ fn from_bytes(data: [u8]) -> (option<tnetstring>, [u8]) {
 
 #[doc = "Deserializes a tnetstring value from a string."]
 fn from_str(data: str) -> (option<tnetstring>, str) {
-    io::with_str_reader(data) {|rdr|
+    do io::with_str_reader(data) |rdr| {
         let tnetstring = from_reader(rdr);
         let bytes = rdr.read_whole_stream();
         (tnetstring, str::from_bytes(bytes))
@@ -250,7 +250,7 @@ fn eq(t0: tnetstring, t1: tnetstring) -> bool {
         (null, null) { true }
         (map(d0), map(d1)) {
           if d0.size() == d1.size() {
-              for d0.each() { |k, v|
+              for d0.each() |k, v| {
                   if !d1.contains_key(k) || !eq(d1.get(k), v) {
                       ret false;
                   }
@@ -271,10 +271,10 @@ mod tests {
 
     fn test(string: str, expected: tnetstring) {
         let (actual, rest) = from_str(string);
-        assert option::is_some(actual);
+        assert actual.is_some();
         assert rest == "";
 
-        let actual = option::get(actual);
+        let actual = actual.get();
         assert eq(actual, expected);
         assert to_str(expected) == string;
     }
@@ -283,11 +283,11 @@ mod tests {
     fn test_format() {
         test("11:hello world,", str(@str::bytes("hello world")));
         test("0:}", map(map::bytes_hash()));
-        test("0:]", vec(@[]));
+        test("0:]", vec(@~[]));
 
         let d = map::bytes_hash();
         d.insert(str::bytes("hello"),
-                vec(@[
+                vec(@~[
                     int(12345678901),
                     str(@str::bytes("this")),
                     bool(true),
@@ -306,25 +306,25 @@ mod tests {
         test("10:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,",
             str(@str::bytes("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")));
         test("24:5:12345#5:67890#5:xxxxx,]",
-            vec(@[
+            vec(@~[
                 int(12345),
                 int(67890),
                 str(@str::bytes("xxxxx"))]));
         test("18:3:0.1^3:0.2^3:0.4^]",
-           vec(@[float(0.1), float(0.2), float(0.4)]));
+           vec(@~[float(0.1), float(0.2), float(0.4)]));
         test("243:238:233:228:223:218:213:208:203:198:193:188:183:178:173:" +
             "168:163:158:153:148:143:138:133:128:123:118:113:108:103:99:95:" +
             "91:87:83:79:75:71:67:63:59:55:51:47:43:39:35:31:27:23:19:15:" +
             "11:hello-there,]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]" +
             "]]]]",
             vec(
-                @[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(
-                @[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(
-                @[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(
-                @[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(
-                @[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(
-                @[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(@[vec(
-                @[vec(@[vec(@[
+                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
+                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
+                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
+                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
+                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
+                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
+                @~[vec(@~[vec(@~[
                     str(@str::bytes("hello-there"))
                 ])])])])])])])])])])])])])])])])])])])])])])])])])])])])
                 ])])])])])])])])])])])])])])])])])])])])])])]));
@@ -340,9 +340,9 @@ mod tests {
             if randint(rng, depth, 10u32) <= 4u32 {
                 if randint(rng, 0u32, 1u32) == 0u32 {
                     let n = randint(rng, 0u32, 10u32);
-                    vec(@vec::from_fn(n as uint) { |_i|
+                    vec(@vec::from_fn(n as uint, |_i|
                         get_random_object(rng, depth + 1u32)
-                    })
+                    ))
                 } else {
                     let d = map::bytes_hash();
 
@@ -402,7 +402,7 @@ mod tests {
             let v0 = get_random_object(rng, 0u32);
             
             alt from_bytes(to_bytes(v0)) {
-                (some(v1), rest) if rest == [] {
+                (some(v1), rest) if rest == ~[] {
                     assert eq(v0, v1);
                 }
                 _ { fail; }
