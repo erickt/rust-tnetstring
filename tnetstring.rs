@@ -17,13 +17,13 @@ export from_str;
 
 /// Represents a tnetstring value.
 enum tnetstring {
-    str(@~[u8]),
+    str(~[u8]),
     int(int),
     float(float),
     bool(bool),
     null,
-    map(map::hashmap<~[u8], tnetstring>),
-    vec(@~[tnetstring]),
+    map(~send_map::linear::LinearMap<~[u8], tnetstring>),
+    vec(~[tnetstring]),
 }
 
 /// Serializes a tnetstring value into a io::Writer.
@@ -35,7 +35,7 @@ fn to_writer(writer: io::Writer, tnetstring: tnetstring) {
     }
 
     match tnetstring {
-        str(s) => write_str(writer, *s),
+        str(s) => write_str(writer, s),
         int(i) => {
             let s = int::str(i);
             writer.write_str(#fmt("%u:%s#", s.len(), s));
@@ -51,9 +51,9 @@ fn to_writer(writer: io::Writer, tnetstring: tnetstring) {
         map(m) => {
             let buf = io::mem_buffer();
             let wr = io::mem_buffer_writer(buf);
-            for m.each |key, value| {
-                write_str(wr, key);
-                to_writer(wr, value);
+            for m.each_ref |key, value| {
+                write_str(wr, *key);
+                to_writer(wr, *value);
             }
             let payload = io::mem_buffer_buf(buf);
             writer.write_str(#fmt("%u:", payload.len()));
@@ -152,7 +152,7 @@ fn from_reader(reader: io::Reader) -> Option<tnetstring> {
         assert payload.len() == 0u;
         Some(null)
       }
-      ',' => Some(str(@payload)),
+      ',' => Some(str(payload)),
       c => {
         let s = str::from_char(c);
         fail #fmt("Invalid payload type: %?", s)
@@ -160,59 +160,57 @@ fn from_reader(reader: io::Reader) -> Option<tnetstring> {
     }
 }
 
-fn parse_vec(data: ~[u8]) -> @~[tnetstring] {
-    if data.len() == 0u { return @~[]; }
+fn parse_vec(data: ~[u8]) -> ~[tnetstring] {
+    if data.len() == 0u { return ~[]; }
 
     do io::with_bytes_reader(data) |reader| {
-        let result = DVec();
+        let mut result = ~[];
 
-        let value = from_reader(reader);
-        assert value.is_some();
-
-        result.push(value.get());
-
-        while !reader.eof() {
-            let value = from_reader(reader);
-            assert value.is_some();
-            result.push(value.get());
+        match move from_reader(reader) {
+            Some(move value) => vec::push(result, value),
+            None => fail ~"invalid value"
         }
 
-        @vec::from_mut(dvec::unwrap(result))
-    }
-}
-
-fn parse_pair(reader: io::Reader) -> (@~[u8], tnetstring) {
-    let key = from_reader(reader);
-    assert key.is_some();
-    assert !reader.eof();
-
-    match key {
-      Some(str(key)) => {
-        let value = from_reader(reader);
-        assert value.is_some();
-
-        (key, value.get())
-      }
-      _ => fail ~"Keys can only be strings.",
-    }
-}
-
-fn parse_map(data: ~[u8]) -> map::hashmap<~[u8], tnetstring> {
-    if data.len() == 0u { return map::bytes_hash(); }
-
-    do io::with_bytes_reader(data) |reader| {
-        let result = map::bytes_hash();
-
-        let (key, value) = parse_pair(reader);
-        result.insert(copy *key, value);
-
         while !reader.eof() {
-            let (key, value) = parse_pair(reader);
-            result.insert(copy *key, value);
+            match move from_reader(reader) {
+                Some(move value) => vec::push(result, value),
+                None => fail ~"invalid tnetstring"
+            }
         }
 
         result
     }
+}
+
+fn parse_pair(reader: io::Reader) -> (~[u8], tnetstring) {
+    match move from_reader(reader) {
+        Some(str(move key)) => {
+            match move from_reader(reader) {
+                Some(move value) => (key, value),
+                None => fail ~"invalid tnetstring",
+            }
+        }
+        Some(_) => fail ~"Keys can only be strings.",
+        None => fail ~"Invalid tnetstring",
+    }
+}
+
+fn parse_map(data: ~[u8]) -> ~send_map::linear::LinearMap<~[u8], tnetstring> {
+    let result = ~send_map::linear::LinearMap();
+
+    if data.len() != 0u {
+        do io::with_bytes_reader(data) |reader| {
+            let (key, value) = parse_pair(reader);
+            result.insert(key, value);
+
+            while !reader.eof() {
+                let (key, value) = parse_pair(reader);
+                result.insert(key, value);
+            }
+        }
+    }
+
+    result
 }
 
 /// Deserializes a tnetstring value from a byte string.
@@ -234,26 +232,31 @@ fn from_str(data: &str) -> (Option<tnetstring>, ~str) {
 }
 
 /// Test the equality between two tnetstring values
-fn eq(t0: tnetstring, t1: tnetstring) -> bool {
-    match (t0, t1) {
+fn eq(t0: &tnetstring, t1: &tnetstring) -> bool {
+    // FIXME: https://github.com/mozilla/rust/issues/2855
+    match (copy *t0, copy *t1) {
         (str(s0), str(s1)) => s0 == s1,
         (int(i0), int(i1)) => i0 == i1,
         (float(f0), float(f1)) => f0 == f1,
         (bool(b0), bool(b1)) => b0 == b1,
         (null, null) => true,
         (map(d0), map(d1)) => {
-          if d0.size() == d1.size() {
-              for d0.each() |k, v| {
-                  if !d1.contains_key(k) || !eq(d1.get(k), v) {
-                      return false;
-                  }
-              }
-              true
-          } else {
-              false
-          }
+            if d0.len() == d1.len() {
+                for d0.each_ref |k0, v0| {
+                    let result = do d1.with_find_ref(k0) |v1| {
+                        match v1 {
+                            Some(v1) => eq(v0, v1),
+                            None => false,
+                        }
+                    };
+                    if !result { return false; }
+                }
+                true
+            } else {
+                false
+            }
         }
-        (vec(v0), vec(v1)) => vec::all2(*v0, *v1, eq),
+        (vec(v0), vec(v1)) => vec::all2(v0, v1, |x0, x1| eq(&x0, &x1)),
         _ => false
     }
 }
@@ -267,58 +270,58 @@ mod tests {
         assert actual.is_some();
         assert rest == ~"";
 
-        let actual = actual.get();
-        assert eq(actual, expected);
+        let actual = option::unwrap(actual);
+        assert eq(&actual, &expected);
         assert to_str(expected) == string;
     }
 
     #[test]
     fn test_format() {
-        test(~"11:hello world,", str(@str::to_bytes("hello world")));
-        test(~"0:}", map(map::bytes_hash()));
-        test(~"0:]", vec(@~[]));
+        test(~"11:hello world,", str(str::to_bytes("hello world")));
+        test(~"0:}", map(~send_map::linear::LinearMap()));
+        test(~"0:]", vec(~[]));
 
-        let d = map::bytes_hash();
+        let d = ~send_map::linear::LinearMap();
         d.insert(str::to_bytes("hello"),
-                vec(@~[
+                vec(~[
                     int(12345678901),
-                    str(@str::to_bytes("this")),
+                    str(str::to_bytes("this")),
                     bool(true),
                     null,
-                    str(@str::to_bytes("\x00\x00\x00\x00"))]));
+                    str(str::to_bytes("\x00\x00\x00\x00"))]));
 
         test(~"51:5:hello,39:11:12345678901#4:this,4:true!0:~4:\x00\x00\x00\
                \x00,]}", map(d));
 
         test(~"5:12345#", int(12345));
-        test(~"12:this is cool,", str(@str::to_bytes("this is cool")));
-        test(~"0:,", str(@str::to_bytes("")));
+        test(~"12:this is cool,", str(str::to_bytes("this is cool")));
+        test(~"0:,", str(str::to_bytes("")));
         test(~"0:~", null);
         test(~"4:true!", bool(true));
         test(~"5:false!", bool(false));
         test(~"10:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,",
-            str(@str::to_bytes("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")));
+            str(str::to_bytes("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")));
         test(~"24:5:12345#5:67890#5:xxxxx,]",
-            vec(@~[
+            vec(~[
                 int(12345),
                 int(67890),
-                str(@str::to_bytes("xxxxx"))]));
+                str(str::to_bytes("xxxxx"))]));
         test(~"18:3:0.1^3:0.2^3:0.4^]",
-           vec(@~[float(0.1), float(0.2), float(0.4)]));
+           vec(~[float(0.1), float(0.2), float(0.4)]));
         test(~"243:238:233:228:223:218:213:208:203:198:193:188:183:178:173:\
                168:163:158:153:148:143:138:133:128:123:118:113:108:103:99:95:\
                91:87:83:79:75:71:67:63:59:55:51:47:43:39:35:31:27:23:19:15:\
                11:hello-there,]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\
                ]]]]",
             vec(
-                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
-                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
-                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
-                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
-                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
-                @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
-                @~[vec(@~[vec(@~[
-                    str(@str::to_bytes("hello-there"))
+                ~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(
+                ~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(
+                ~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(
+                ~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(
+                ~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(
+                ~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(~[vec(
+                ~[vec(~[vec(~[
+                    str(str::to_bytes("hello-there"))
                 ])])])])])])])])])])])])])])])])])])])])])])])])])])])])
                 ])])])])])])])])])])])])])])])])])])])])])])]));
     }
@@ -333,11 +336,11 @@ mod tests {
             if randint(rng, depth, 10u32) <= 4u32 {
                 if randint(rng, 0u32, 1u32) == 0u32 {
                     let n = randint(rng, 0u32, 10u32);
-                    vec(@vec::from_fn(n as uint, |_i|
+                    vec(vec::from_fn(n as uint, |_i|
                         get_random_object(rng, depth + 1u32)
                     ))
                 } else {
-                    let d = map::bytes_hash();
+                    let d = ~send_map::linear::LinearMap();
 
                     let mut i = randint(rng, 0u32, 10u32);
                     while i != 0u32 {
@@ -381,7 +384,7 @@ mod tests {
                     }
                   }
                   5u32 => {
-                    str(@rng.gen_bytes(randint(rng, 0u32, 100u32) as uint))
+                    str(rng.gen_bytes(randint(rng, 0u32, 100u32) as uint))
                   }
                   _ => fail
                 }
@@ -395,7 +398,7 @@ mod tests {
             let v0 = get_random_object(rng, 0u32);
             
             match from_bytes(to_bytes(v0)) {
-                (Some(v1), rest) if rest == ~[] => assert eq(v0, v1),
+                (Some(v1), rest) if rest == ~[] => assert eq(&v0, &v1),
                 _ => fail ~"invalid tnetstring"
             }
             i -= 1u;
