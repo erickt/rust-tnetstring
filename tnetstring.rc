@@ -4,8 +4,8 @@
 #[crate_type = "lib"];
 
 use std;
-import io::{reader_util, writer_util};
-import dvec::{dvec, extensions};
+import io::{ReaderUtil, WriterUtil};
+import dvec::DVec;
 
 import std::map;
 import std::map::hashmap;

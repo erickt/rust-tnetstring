@@ -1,4 +1,4 @@
-#[doc = "Rust TNetStrings serialization library."];
+/// Rust TNetStrings serialization library.
 
 export tnetstring;
 export str;
@@ -15,47 +15,40 @@ export from_reader;
 export from_bytes;
 export from_str;
 
-#[doc = "Represents a tnetstring value."]
+/// Represents a tnetstring value.
 enum tnetstring {
-    #[doc = "str"]
     str(@~[u8]),
-    #[doc = "int"]
     int(int),
-    #[doc = "floating"]
     float(float),
-    #[doc = "boolean"]
     bool(bool),
-    #[doc = "null"]
     null,
-    #[doc = "map"]
     map(map::hashmap<~[u8], tnetstring>),
-    #[doc = "list"]
     vec(@~[tnetstring]),
 }
 
-#[doc = "Serializes a tnetstring value into a io::writer."]
-fn to_writer(writer: io::writer, tnetstring: tnetstring) {
-    fn write_str(wr: io::writer, s: &[u8]) {
+/// Serializes a tnetstring value into a io::Writer.
+fn to_writer(writer: io::Writer, tnetstring: tnetstring) {
+    fn write_str(wr: io::Writer, s: &[u8]) {
         wr.write_str(#fmt("%u:", s.len()));
         wr.write(s);
         wr.write_char(',');
     }
 
-    alt tnetstring {
-        str(s) { write_str(writer, *s) }
-        int(i) {
+    match tnetstring {
+        str(s) => write_str(writer, *s),
+        int(i) => {
             let s = int::str(i);
             writer.write_str(#fmt("%u:%s#", s.len(), s));
         }
-        float(f) {
+        float(f) => {
             let s = float::to_str(f, 6u);
             writer.write_str(#fmt("%u:%s^", s.len(), s));
         }
-        bool(b) {
+        bool(b) => {
             let s = bool::to_str(b);
             writer.write_str(#fmt("%u:%s!", s.len(), s));
         }
-        map(m) {
+        map(m) => {
             let buf = io::mem_buffer();
             let wr = io::mem_buffer_writer(buf);
             for m.each |key, value| {
@@ -67,7 +60,7 @@ fn to_writer(writer: io::writer, tnetstring: tnetstring) {
             writer.write(payload);
             writer.write_char('}');
         }
-        vec(v) {
+        vec(v) => {
             let buf = io::mem_buffer();
             let wr = io::mem_buffer_writer(buf);
             for v.each |e| { to_writer(wr, e) }
@@ -76,13 +69,11 @@ fn to_writer(writer: io::writer, tnetstring: tnetstring) {
             writer.write(payload);
             writer.write_char(']');
         }
-        null {
-            writer.write_str("0:~");
-        }
+        null => writer.write_str("0:~"),
     }
 }
 
-#[doc = "Serializes a tnetstring value into a byte string."]
+/// Serializes a tnetstring value into a byte string.
 fn to_bytes(tnetstring: tnetstring) -> ~[u8] {
     let buf = io::mem_buffer();
     let wr = io::mem_buffer_writer(buf);
@@ -90,16 +81,16 @@ fn to_bytes(tnetstring: tnetstring) -> ~[u8] {
     io::mem_buffer_buf(buf)
 }
 
-#[doc = "Serializes a tnetstring value into a string."]
-fn to_str(tnetstring: tnetstring) -> str {
+/// Serializes a tnetstring value into a string.
+fn to_str(tnetstring: tnetstring) -> ~str {
     let buf = io::mem_buffer();
     let wr = io::mem_buffer_writer(buf);
     to_writer(wr, tnetstring);
     io::mem_buffer_str(buf)
 }
 
-#[doc = "Deserializes a tnetstring value from an io::reader."]
-fn from_reader(reader: io::reader) -> option<tnetstring> {
+/// Deserializes a tnetstring value from an io::Reader.
+fn from_reader(reader: io::Reader) -> Option<tnetstring> {
     assert !reader.eof();
 
     let mut c = reader.read_byte();
@@ -108,7 +99,7 @@ fn from_reader(reader: io::reader) -> option<tnetstring> {
     // Note that netstring spec explicitly forbids padding zeros.
     // If the first char is zero, it must be the only char.
     if c < '0' as int || c > '9' as int {
-        fail "Not a tnetstring: invalid or missing length prefix";
+        fail ~"Not a tnetstring: invalid or missing length prefix";
     } else if c == '0' as int {
         c = reader.read_byte();
     } else {
@@ -116,7 +107,7 @@ fn from_reader(reader: io::reader) -> option<tnetstring> {
             len = (10u * len) + ((c as uint) - ('0' as uint));
 
             if reader.eof() {
-                fail "Not a tnetstring: invalid or missing length prefix";
+                fail ~"Not a tnetstring: invalid or missing length prefix";
             }
             c = reader.read_byte();
 
@@ -128,41 +119,41 @@ fn from_reader(reader: io::reader) -> option<tnetstring> {
 
     // Validate end-of-length-prefix marker.
     if c != ':' as int {
-        fail "Not a tnetstring: missing length prefix";
+        fail ~"Not a tnetstring: missing length prefix";
     }
 
     // Read the data plus terminating type tag.
     let payload = reader.read_bytes(len);
 
     if payload.len() != len {
-        fail "Not a tnetstring: invalid length prefix";
+        fail ~"Not a tnetstring: invalid length prefix";
     }
 
     if reader.eof() {
-        fail "Not a tnetstring: missing type tag";
+        fail ~"Not a tnetstring: missing type tag";
     }
 
-    alt reader.read_byte() as char {
-      '#' {
+    match reader.read_byte() as char {
+      '#' => {
         let s = unsafe { str::unsafe::from_bytes(payload) };
         int::from_str(s).map(|v| int(v))
       }
-      '}' { some(map(parse_map(payload))) }
-      ']' { some(vec(parse_vec(payload))) }
-      '!' {
+      '}' => Some(map(parse_map(payload))),
+      ']' => Some(vec(parse_vec(payload))),
+      '!' => {
         let s = unsafe { str::unsafe::from_bytes(payload) };
         bool::from_str(s).map(|v| bool(v))
       }
-      '^' {
+      '^' => {
         let s = unsafe { str::unsafe::from_bytes(payload) };
         float::from_str(s).map(|v| float(v))
       }
-      '~' {
+      '~' => {
         assert payload.len() == 0u;
-        some(null)
+        Some(null)
       }
-      ',' { some(str(@payload)) }
-      c {
+      ',' => Some(str(@payload)),
+      c => {
         let s = str::from_char(c);
         fail #fmt("Invalid payload type: %?", s)
       }
@@ -170,68 +161,70 @@ fn from_reader(reader: io::reader) -> option<tnetstring> {
 }
 
 fn parse_vec(data: ~[u8]) -> @~[tnetstring] {
-    if data.len() == 0u { ret @~[]; }
+    if data.len() == 0u { return @~[]; }
 
-    let reader = io::bytes_reader(data);
+    do io::with_bytes_reader(data) |reader| {
+        let result = DVec();
 
-    let result = dvec();
-
-    let value = from_reader(reader);
-    assert value.is_some();
-
-    result.push(value.get());
-
-    while !reader.eof() {
         let value = from_reader(reader);
         assert value.is_some();
-        result.push(value.get());
-    }
 
-    @vec::from_mut(dvec::unwrap(result))
+        result.push(value.get());
+
+        while !reader.eof() {
+            let value = from_reader(reader);
+            assert value.is_some();
+            result.push(value.get());
+        }
+
+        @vec::from_mut(dvec::unwrap(result))
+    }
 }
 
-fn parse_pair(reader: io::reader) -> (@~[u8], tnetstring) {
+fn parse_pair(reader: io::Reader) -> (@~[u8], tnetstring) {
     let key = from_reader(reader);
     assert key.is_some();
     assert !reader.eof();
 
-    alt key {
-      some(str(key)) {
+    match key {
+      Some(str(key)) => {
         let value = from_reader(reader);
         assert value.is_some();
 
         (key, value.get())
       }
-      _ { fail "Keys can only be strings." }
+      _ => fail ~"Keys can only be strings.",
     }
 }
 
 fn parse_map(data: ~[u8]) -> map::hashmap<~[u8], tnetstring> {
-    if data.len() == 0u { ret map::bytes_hash(); }
+    if data.len() == 0u { return map::bytes_hash(); }
 
-    let reader = io::bytes_reader(data);
-    let result = map::bytes_hash();
+    do io::with_bytes_reader(data) |reader| {
+        let result = map::bytes_hash();
 
-    let (key, value) = parse_pair(reader);
-    result.insert(copy *key, value);
-
-    while !reader.eof() {
         let (key, value) = parse_pair(reader);
         result.insert(copy *key, value);
+
+        while !reader.eof() {
+            let (key, value) = parse_pair(reader);
+            result.insert(copy *key, value);
+        }
+
+        result
     }
-
-    ret result;
 }
 
-#[doc = "Deserializes a tnetstring value from a byte string."]
-fn from_bytes(data: ~[u8]) -> (option<tnetstring>, ~[u8]) {
-    let rdr = io::bytes_reader(data);
-    let tnetstring = from_reader(rdr);
-    (tnetstring, rdr.read_whole_stream())
+/// Deserializes a tnetstring value from a byte string.
+fn from_bytes(data: ~[u8]) -> (Option<tnetstring>, ~[u8]) {
+    do io::with_bytes_reader(data) |reader| {
+        let tnetstring = from_reader(reader);
+        (tnetstring, reader.read_whole_stream())
+    }
 }
 
-#[doc = "Deserializes a tnetstring value from a string."]
-fn from_str(data: str) -> (option<tnetstring>, str) {
+/// Deserializes a tnetstring value from a string.
+fn from_str(data: &str) -> (Option<tnetstring>, ~str) {
     do io::with_str_reader(data) |rdr| {
         let tnetstring = from_reader(rdr);
         let bytes = rdr.read_whole_stream();
@@ -240,19 +233,19 @@ fn from_str(data: str) -> (option<tnetstring>, str) {
 
 }
 
-#[doc = "Test the equality between two tnetstring values"]
+/// Test the equality between two tnetstring values
 fn eq(t0: tnetstring, t1: tnetstring) -> bool {
-    alt (t0, t1) {
-        (str(s0), str(s1)) { s0 == s1 }
-        (int(i0), int(i1)) { i0 == i1 }
-        (float(f0), float(f1)) { f0 == f1 }
-        (bool(b0), bool(b1)) { b0 == b1 }
-        (null, null) { true }
-        (map(d0), map(d1)) {
+    match (t0, t1) {
+        (str(s0), str(s1)) => s0 == s1,
+        (int(i0), int(i1)) => i0 == i1,
+        (float(f0), float(f1)) => f0 == f1,
+        (bool(b0), bool(b1)) => b0 == b1,
+        (null, null) => true,
+        (map(d0), map(d1)) => {
           if d0.size() == d1.size() {
               for d0.each() |k, v| {
                   if !d1.contains_key(k) || !eq(d1.get(k), v) {
-                      ret false;
+                      return false;
                   }
               }
               true
@@ -260,8 +253,8 @@ fn eq(t0: tnetstring, t1: tnetstring) -> bool {
               false
           }
         }
-        (vec(v0), vec(v1)) { vec::all2(*v0, *v1, eq) }
-        _ { false }
+        (vec(v0), vec(v1)) => vec::all2(*v0, *v1, eq),
+        _ => false
     }
 }
 
@@ -269,10 +262,10 @@ fn eq(t0: tnetstring, t1: tnetstring) -> bool {
 mod tests {
     // Tests inspired by https://github.com/rfk/tnetstring.
 
-    fn test(string: str, expected: tnetstring) {
+    fn test(string: ~str, expected: tnetstring) {
         let (actual, rest) = from_str(string);
         assert actual.is_some();
-        assert rest == "";
+        assert rest == ~"";
 
         let actual = actual.get();
         assert eq(actual, expected);
@@ -281,42 +274,42 @@ mod tests {
 
     #[test]
     fn test_format() {
-        test("11:hello world,", str(@str::bytes("hello world")));
-        test("0:}", map(map::bytes_hash()));
-        test("0:]", vec(@~[]));
+        test(~"11:hello world,", str(@str::to_bytes("hello world")));
+        test(~"0:}", map(map::bytes_hash()));
+        test(~"0:]", vec(@~[]));
 
         let d = map::bytes_hash();
-        d.insert(str::bytes("hello"),
+        d.insert(str::to_bytes("hello"),
                 vec(@~[
                     int(12345678901),
-                    str(@str::bytes("this")),
+                    str(@str::to_bytes("this")),
                     bool(true),
                     null,
-                    str(@str::bytes("\x00\x00\x00\x00"))]));
+                    str(@str::to_bytes("\x00\x00\x00\x00"))]));
 
-        test("51:5:hello,39:11:12345678901#4:this,4:true!0:~4:\x00\x00\x00" +
-            "\x00,]}", map(d));
+        test(~"51:5:hello,39:11:12345678901#4:this,4:true!0:~4:\x00\x00\x00\
+               \x00,]}", map(d));
 
-        test("5:12345#", int(12345));
-        test("12:this is cool,", str(@str::bytes("this is cool")));
-        test("0:,", str(@str::bytes("")));
-        test("0:~", null);
-        test("4:true!", bool(true));
-        test("5:false!", bool(false));
-        test("10:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,",
-            str(@str::bytes("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")));
-        test("24:5:12345#5:67890#5:xxxxx,]",
+        test(~"5:12345#", int(12345));
+        test(~"12:this is cool,", str(@str::to_bytes("this is cool")));
+        test(~"0:,", str(@str::to_bytes("")));
+        test(~"0:~", null);
+        test(~"4:true!", bool(true));
+        test(~"5:false!", bool(false));
+        test(~"10:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,",
+            str(@str::to_bytes("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")));
+        test(~"24:5:12345#5:67890#5:xxxxx,]",
             vec(@~[
                 int(12345),
                 int(67890),
-                str(@str::bytes("xxxxx"))]));
-        test("18:3:0.1^3:0.2^3:0.4^]",
+                str(@str::to_bytes("xxxxx"))]));
+        test(~"18:3:0.1^3:0.2^3:0.4^]",
            vec(@~[float(0.1), float(0.2), float(0.4)]));
-        test("243:238:233:228:223:218:213:208:203:198:193:188:183:178:173:" +
-            "168:163:158:153:148:143:138:133:128:123:118:113:108:103:99:95:" +
-            "91:87:83:79:75:71:67:63:59:55:51:47:43:39:35:31:27:23:19:15:" +
-            "11:hello-there,]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]" +
-            "]]]]",
+        test(~"243:238:233:228:223:218:213:208:203:198:193:188:183:178:173:\
+               168:163:158:153:148:143:138:133:128:123:118:113:108:103:99:95:\
+               91:87:83:79:75:71:67:63:59:55:51:47:43:39:35:31:27:23:19:15:\
+               11:hello-there,]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\
+               ]]]]",
             vec(
                 @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
                 @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
@@ -325,18 +318,18 @@ mod tests {
                 @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
                 @~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(@~[vec(
                 @~[vec(@~[vec(@~[
-                    str(@str::bytes("hello-there"))
+                    str(@str::to_bytes("hello-there"))
                 ])])])])])])])])])])])])])])])])])])])])])])])])])])])])
                 ])])])])])])])])])])])])])])])])])])])])])])]));
     }
 
     #[test]
     fn test_random() {
-        fn randint(rng: rand::rng, a: u32, b: u32) -> u32 {
+        fn randint(rng: rand::Rng, a: u32, b: u32) -> u32 {
             (rng.next() % (b - a + 1u32)) + a
         }
 
-        fn get_random_object(rng: rand::rng, depth: u32) -> tnetstring {
+        fn get_random_object(rng: rand::Rng, depth: u32) -> tnetstring {
             if randint(rng, depth, 10u32) <= 4u32 {
                 if randint(rng, 0u32, 1u32) == 0u32 {
                     let n = randint(rng, 0u32, 10u32);
@@ -355,29 +348,29 @@ mod tests {
                     map(d)
                 }
             } else {
-                alt randint(rng, 0u32, 5u32) {
-                  0u32 { null }
-                  1u32 { bool(true) }
-                  2u32 { bool(false) }
-                  3u32 {
+                match randint(rng, 0u32, 5u32) {
+                  0u32 => null,
+                  1u32 => bool(true),
+                  2u32 => bool(false),
+                  3u32 => {
                     if randint(rng, 0u32, 1u32) == 0u32 {
                         int(rng.next() as int)
                     } else {
                         int(-rng.next() as int)
                     }
                   }
-                  4u32 {
+                  4u32 => {
                     let mut f = rng.gen_float();
 
                     // Generate a float that can be exactly converted to
                     // and from a string.
                     loop {
-                        alt float::from_str(float::to_str(f, 6u)) {
-                          some(f1) {
+                        match float::from_str(float::to_str(f, 6u)) {
+                          Some(f1) => {
                             if f == f1 { break; }
                             f = f1;
                           }
-                          none { fail }
+                          None => fail ~"invalid float"
                         }
                     }
 
@@ -387,25 +380,23 @@ mod tests {
                         float(-f)
                     }
                   }
-                  5u32 {
+                  5u32 => {
                     str(@rng.gen_bytes(randint(rng, 0u32, 100u32) as uint))
                   }
-                  _ { fail }
+                  _ => fail
                 }
             }
         }
 
-        let rng = rand::rng();
+        let rng = rand::Rng();
 
         let mut i = 500u;
         while i != 0u {
             let v0 = get_random_object(rng, 0u32);
             
-            alt from_bytes(to_bytes(v0)) {
-                (some(v1), rest) if rest == ~[] {
-                    assert eq(v0, v1);
-                }
-                _ { fail; }
+            match from_bytes(to_bytes(v0)) {
+                (Some(v1), rest) if rest == ~[] => assert eq(v0, v1),
+                _ => fail ~"invalid tnetstring"
             }
             i -= 1u;
         }
