@@ -3,10 +3,7 @@
        uuid = "ce93b70c-c22a-45fa-97a7-66ab97009005")];
 #[crate_type = "lib"];
 
-use std;
-import io::{ReaderUtil, WriterUtil};
-import dvec::DVec;
+extern mod std;
 
-import std::map;
-import std::map::hashmap;
-import std::rand;
+use io::{ReaderUtil, WriterUtil};
+use std::rand;
