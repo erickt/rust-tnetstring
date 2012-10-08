@@ -7,9 +7,11 @@ pub enum TNetString {
     Float(float),
     Bool(bool),
     Null,
-    Map(~send_map::linear::LinearMap<~[u8], TNetString>),
+    Map(Map),
     Vec(~[TNetString]),
 }
+
+pub type Map = ~send_map::linear::LinearMap<~[u8], TNetString>;
 
 /// Serializes a TNetString value into a io::Writer.
 pub fn to_writer(writer: io::Writer, tnetstring: &TNetString) {
