@@ -67,9 +67,12 @@ pub fn to_bytes(tnetstring: &TNetString) -> ~[u8] {
 
 /// Serializes a TNetString value into a string.
 pub impl TNetString: to_str::ToStr {
-    fn to_str() -> ~str {
-        do io::with_str_writer |wr| {
-            to_writer(wr, &self);
+    pure fn to_str() -> ~str {
+        // FIXME: https://github.com/mozilla/rust/issues/3758
+        unsafe {
+            do io::with_str_writer |wr| {
+                to_writer(wr, &self);
+            }
         }
     }
 }
@@ -137,7 +140,7 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
         assert payload.len() == 0u;
         Some(Null)
       }
-      ',' => Some(Str(payload)),
+      ',' => Some(Str(move payload)),
       c => {
         let s = str::from_char(c);
         fail #fmt("Invalid payload type: %?", s)
@@ -152,26 +155,26 @@ fn parse_vec(data: &[u8]) -> ~[TNetString] {
         let mut result = ~[];
 
         match move from_reader(reader) {
-            Some(move value) => result.push(value),
+            Some(move value) => result.push(move value),
             None => fail ~"invalid value"
         }
 
         while !reader.eof() {
             match move from_reader(reader) {
-                Some(move value) => result.push(value),
+                Some(move value) => result.push(move value),
                 None => fail ~"invalid TNetString"
             }
         }
 
-        result
+        move result
     }
 }
 
 fn parse_pair(reader: io::Reader) -> (~[u8], TNetString) {
-    match move from_reader(reader) {
+    match from_reader(reader) {
         Some(Str(move key)) => {
-            match move from_reader(reader) {
-                Some(move value) => (key, value),
+            match from_reader(reader) {
+                Some(move value) => (move key, move value),
                 None => fail ~"invalid TNetString",
             }
         }
@@ -186,23 +189,23 @@ fn parse_map(data: &[u8]) -> ~send_map::linear::LinearMap<~[u8], TNetString> {
     if data.len() != 0u {
         do io::with_bytes_reader(data) |reader| {
             let (key, value) = parse_pair(reader);
-            result.insert(key, value);
+            result.insert(move key, move value);
 
             while !reader.eof() {
                 let (key, value) = parse_pair(reader);
-                result.insert(key, value);
+                result.insert(move key, move value);
             }
         }
     }
 
-    result
+    move result
 }
 
 /// Deserializes a TNetString value from a byte string.
 pub fn from_bytes(data: &[u8]) -> (Option<TNetString>, ~[u8]) {
     do io::with_bytes_reader(data) |reader| {
-        let TNetString = from_reader(reader);
-        (TNetString, reader.read_whole_stream())
+        let tnetstring = from_reader(reader);
+        (move tnetstring, reader.read_whole_stream())
     }
 }
 
@@ -211,7 +214,7 @@ pub fn from_str(data: &str) -> (Option<TNetString>, ~str) {
     do io::with_str_reader(data) |rdr| {
         let tnetstring = from_reader(rdr);
         let bytes = rdr.read_whole_stream();
-        (tnetstring, str::from_bytes(bytes))
+        (move tnetstring, str::from_bytes(bytes))
     }
 
 }
@@ -219,7 +222,6 @@ pub fn from_str(data: &str) -> (Option<TNetString>, ~str) {
 /// Test the equality between two TNetString values
 pub impl TNetString: cmp::Eq {
     pure fn eq(other: &TNetString) -> bool {
-        // FIXME: https://github.com/mozilla/rust/issues/2855
         match (&self, other) {
             (&Str(s0), &Str(s1)) => s0 == s1,
             (&Int(i0), &Int(i1)) => i0 == i1,
@@ -252,21 +254,21 @@ pub impl TNetString: cmp::Eq {
 mod tests {
     // Tests inspired by https://github.com/rfk/TNetString.
 
-    fn test(+s: ~str, expected: &TNetString) {
-        let (actual, rest) = from_str(s);
+    fn test(s: &~str, expected: &TNetString) {
+        let (actual, rest) = from_str(*s);
         assert actual.is_some();
         assert rest == ~"";
 
-        let actual = option::unwrap(actual);
+        let actual = option::unwrap(move actual);
         assert actual == *expected;
-        assert expected.to_str() == s;
+        assert expected.to_str() == *s;
     }
 
     #[test]
     fn test_format() {
-        test(~"11:hello world,", &Str(str::to_bytes("hello world")));
-        test(~"0:}", &Map(~send_map::linear::LinearMap()));
-        test(~"0:]", &Vec(~[]));
+        test(&~"11:hello world,", &Str(str::to_bytes("hello world")));
+        test(&~"0:}", &Map(~send_map::linear::LinearMap()));
+        test(&~"0:]", &Vec(~[]));
 
         let mut d = ~send_map::linear::LinearMap();
         d.insert(str::to_bytes("hello"),
@@ -277,25 +279,25 @@ mod tests {
                     Null,
                     Str(str::to_bytes("\x00\x00\x00\x00"))]));
 
-        test(~"51:5:hello,39:11:12345678901#4:this,4:true!0:~4:\x00\x00\x00\
-               \x00,]}", &Map(d));
+        test(&~"51:5:hello,39:11:12345678901#4:this,4:true!0:~4:\x00\x00\x00\
+               \x00,]}", &Map(move d));
 
-        test(~"5:12345#", &Int(12345));
-        test(~"12:this is cool,", &Str(str::to_bytes("this is cool")));
-        test(~"0:,", &Str(str::to_bytes("")));
-        test(~"0:~", &Null);
-        test(~"4:true!", &Bool(true));
-        test(~"5:false!", &Bool(false));
-        test(~"10:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,",
+        test(&~"5:12345#", &Int(12345));
+        test(&~"12:this is cool,", &Str(str::to_bytes("this is cool")));
+        test(&~"0:,", &Str(str::to_bytes("")));
+        test(&~"0:~", &Null);
+        test(&~"4:true!", &Bool(true));
+        test(&~"5:false!", &Bool(false));
+        test(&~"10:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,",
             &Str(str::to_bytes("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")));
-        test(~"24:5:12345#5:67890#5:xxxxx,]",
+        test(&~"24:5:12345#5:67890#5:xxxxx,]",
             &Vec(~[
                 Int(12345),
                 Int(67890),
                 Str(str::to_bytes("xxxxx"))]));
-        test(~"18:3:0.1^3:0.2^3:0.4^]",
+        test(&~"18:3:0.1^3:0.2^3:0.4^]",
            &Vec(~[Float(0.1), Float(0.2), Float(0.4)]));
-        test(~"243:238:233:228:223:218:213:208:203:198:193:188:183:178:173:\
+        test(&~"243:238:233:228:223:218:213:208:203:198:193:188:183:178:173:\
                168:163:158:153:148:143:138:133:128:123:118:113:108:103:99:95:\
                91:87:83:79:75:71:67:63:59:55:51:47:43:39:35:31:27:23:19:15:\
                11:hello-there,]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\
@@ -332,10 +334,13 @@ mod tests {
                     let mut i = randint(rng, 0u32, 10u32);
                     while i != 0u32 {
                         let s = rng.gen_bytes(randint(rng, 0u32, 100u32) as uint);
-                        d.insert(s, get_random_object(rng, depth + 1u32));
+                        d.insert(
+                            move s,
+                            move get_random_object(rng, depth + 1u32)
+                        );
                         i -= 1u32;
                     }
-                    Map(d)
+                    Map(move d)
                 }
             } else {
                 match randint(rng, 0u32, 5u32) {
