@@ -191,7 +191,7 @@ fn parse_pair(reader: io::Reader) -> (~[u8], TNetString) {
 }
 
 fn parse_map(data: &[u8]) -> ~core::hashmap::HashMap<~[u8], TNetString> {
-    let mut result = ~core::hashmap::HashMap();
+    let mut result = ~core::hashmap::HashMap::new();
 
     if data.len() != 0u {
         do io::with_bytes_reader(data) |reader| {
