@@ -38,7 +38,7 @@ pub fn to_writer(writer: @io::Writer, tnetstring: &TNetString) {
             writer.write_str(fmt!("%u:%s#", s.len(), s));
         }
         &Float(f) => {
-            let s = float::to_str(f, 6u);
+            let s = float::to_str_digits(f, 6u);
             writer.write_str(fmt!("%u:%s^", s.len(), s));
         }
         &Bool(b) => {
@@ -369,7 +369,7 @@ mod tests {
                     // Generate a float that can be exactly converted to
                     // and from a string.
                     loop {
-                        match float::from_str(float::to_str(f, 6u)) {
+                        match float::from_str(float::to_str_digits(f, 6u)) {
                           Some(f1) => {
                             if f == f1 { break; }
                             f = f1;
