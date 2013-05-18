@@ -24,8 +24,8 @@ pub enum TNetString {
 pub type Map = ~core::hashmap::HashMap<~[u8], TNetString>;
 
 /// Serializes a TNetString value into a io::Writer.
-pub fn to_writer(writer: io::Writer, tnetstring: &TNetString) {
-    fn write_str(wr: io::Writer, s: &[u8]) {
+pub fn to_writer(writer: @io::Writer, tnetstring: &TNetString) {
+    fn write_str(wr: @io::Writer, s: &[u8]) {
         wr.write_str(fmt!("%u:", s.len()));
         wr.write(s);
         wr.write_char(',');
@@ -85,7 +85,7 @@ impl to_str::ToStr for TNetString {
 }
 
 /// Deserializes a TNetString value from an io::Reader.
-pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
+pub fn from_reader(reader: @io::Reader) -> Option<TNetString> {
     assert!(!reader.eof());
 
     let mut c = reader.read_byte();
@@ -177,7 +177,7 @@ fn parse_vec(data: &[u8]) -> ~[TNetString] {
     }
 }
 
-fn parse_pair(reader: io::Reader) -> (~[u8], TNetString) {
+fn parse_pair(reader: @io::Reader) -> (~[u8], TNetString) {
     match from_reader(reader) {
         Some(Str(key)) => {
             match from_reader(reader) {
