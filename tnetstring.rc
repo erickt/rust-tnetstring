@@ -8,7 +8,6 @@
 extern mod std;
 
 use core::io::{ReaderUtil, WriterUtil};
-use std::rand;
 use core::from_str::FromStr;
 
 /// Represents a TNetString value.
