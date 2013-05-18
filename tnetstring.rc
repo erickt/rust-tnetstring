@@ -7,7 +7,7 @@
 
 extern mod std;
 
-use io::{ReaderUtil, WriterUtil};
+use core::io::{ReaderUtil, WriterUtil};
 use std::rand;
 
 /// Represents a TNetString value.
