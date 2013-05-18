@@ -97,7 +97,7 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
     // Note that netstring spec explicitly forbids padding zeros.
     // If the first char is zero, it must be the only char.
     if c < '0' as int || c > '9' as int {
-        fail ~"Not a TNetString: invalid or missing length prefix";
+        fail!(~"Not a TNetString: invalid or missing length prefix");
     } else if c == '0' as int {
         c = reader.read_byte();
     } else {
@@ -105,7 +105,7 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
             len = (10u * len) + ((c as uint) - ('0' as uint));
 
             if reader.eof() {
-                fail ~"Not a TNetString: invalid or missing length prefix";
+                fail!(~"Not a TNetString: invalid or missing length prefix");
             }
             c = reader.read_byte();
 
@@ -117,18 +117,18 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
 
     // Validate end-of-length-prefix marker.
     if c != ':' as int {
-        fail ~"Not a TNetString: missing length prefix";
+        fail!(~"Not a TNetString: missing length prefix");
     }
 
     // Read the data plus terminating type tag.
     let payload = reader.read_bytes(len);
 
     if payload.len() != len {
-        fail ~"Not a TNetString: invalid length prefix";
+        fail!(~"Not a TNetString: invalid length prefix");
     }
 
     if reader.eof() {
-        fail ~"Not a TNetString: missing type tag";
+        fail!(~"Not a TNetString: missing type tag");
     }
 
     match reader.read_byte() as char {
@@ -153,7 +153,7 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
       ',' => Some(Str(move payload)),
       c => {
         let s = str::from_char(c);
-        fail fmt!("Invalid payload type: %?", s)
+        fail!(fmt!("Invalid payload type: %?", s))
       }
     }
 }
@@ -166,13 +166,13 @@ fn parse_vec(data: &[u8]) -> ~[TNetString] {
 
         match move from_reader(reader) {
             Some(move value) => result.push(move value),
-            None => fail ~"invalid value"
+            None => fail!(~"invalid value")
         }
 
         while !reader.eof() {
             match move from_reader(reader) {
                 Some(move value) => result.push(move value),
-                None => fail ~"invalid TNetString"
+                None => fail!(~"invalid TNetString")
             }
         }
 
@@ -185,11 +185,11 @@ fn parse_pair(reader: io::Reader) -> (~[u8], TNetString) {
         Some(Str(move key)) => {
             match from_reader(reader) {
                 Some(move value) => (move key, move value),
-                None => fail ~"invalid TNetString",
+                None => fail!(~"invalid TNetString"),
             }
         }
-        Some(_) => fail ~"Keys can only be strings.",
-        None => fail ~"Invalid TNetString",
+        Some(_) => fail!(~"Keys can only be strings."),
+        None => fail!(~"Invalid TNetString"),
     }
 }
 
@@ -377,7 +377,7 @@ mod tests {
                             if f == f1 { break; }
                             f = f1;
                           }
-                          None => fail ~"invalid float"
+                          None => fail!(~"invalid float")
                         }
                     }
 
@@ -405,7 +405,7 @@ mod tests {
                 (Some(ref v1), ref rest) if *rest == ~[] => {
                     assert!(v0 == *v1)
                 },
-                _ => fail ~"invalid TNetString"
+                _ => fail!(~"invalid TNetString")
             }
             i -= 1u;
         }
