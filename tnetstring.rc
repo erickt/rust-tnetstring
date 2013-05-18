@@ -34,7 +34,7 @@ pub fn to_writer(writer: io::Writer, tnetstring: &TNetString) {
     match tnetstring {
         &Str(ref s) => write_str(writer, *s),
         &Int(i) => {
-            let s = int::str(i);
+            let s = int::to_str(i);
             writer.write_str(fmt!("%u:%s#", s.len(), s));
         }
         &Float(f) => {
