@@ -238,7 +238,9 @@ impl cmp::Eq for TNetString {
             (&Map(ref d0), &Map(ref d1)) => {
                 if d0.len() == d1.len() {
                     for d0.each |k0, v0| {
-                        let result = match d1.find_ref(k0) {
+                        // XXX send_map::linear::LinearMap has find_ref, but
+                        // that method is not available for HashMap.
+                        let result = match d1.find(k0) {
                             Some(v1) => v0 == v1,
                             None => false,
                         };
