@@ -89,7 +89,7 @@ pub impl TNetString: to_str::ToStr {
 
 /// Deserializes a TNetString value from an io::Reader.
 pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
-    assert !reader.eof();
+    assert!(!reader.eof());
 
     let mut c = reader.read_byte();
     let mut len = 0u;
@@ -147,7 +147,7 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
         float::from_str(s).map(|v| Float(*v))
       }
       '~' => {
-        assert payload.len() == 0u;
+        assert!(payload.len() == 0u);
         Some(Null)
       }
       ',' => Some(Str(move payload)),
@@ -268,12 +268,12 @@ mod tests {
 
     fn test(s: &~str, expected: &TNetString) {
         let (actual, rest) = from_str(*s);
-        assert actual.is_some();
-        assert rest == ~"";
+        assert!(actual.is_some());
+        assert!(rest == ~"");
 
         let actual = option::unwrap(move actual);
-        assert actual == *expected;
-        assert expected.to_str() == *s;
+        assert!(actual == *expected);
+        assert!(expected.to_str() == *s);
     }
 
     #[test]
@@ -400,10 +400,10 @@ mod tests {
         let mut i = 500u;
         while i != 0u {
             let v0 = get_random_object(rng, 0u32);
-            
+
             match from_bytes(to_bytes(&v0)) {
                 (Some(ref v1), ref rest) if *rest == ~[] => {
-                    assert v0 == *v1
+                    assert!(v0 == *v1)
                 },
                 _ => fail ~"invalid TNetString"
             }
