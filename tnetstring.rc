@@ -9,6 +9,7 @@ extern mod std;
 
 use core::io::{ReaderUtil, WriterUtil};
 use std::rand;
+use core::from_str::FromStr;
 
 /// Represents a TNetString value.
 pub enum TNetString {
@@ -137,7 +138,7 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
       ']' => Some(Vec(parse_vec(payload))),
       '!' => {
         let s = unsafe { str::raw::from_bytes(payload) };
-        bool::from_str(s).map(|v| Bool(*v))
+        FromStr::from_str(s).map(|v| Bool(*v))
       }
       '^' => {
         let s = unsafe { str::raw::from_bytes(payload) };
