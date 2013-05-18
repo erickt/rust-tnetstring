@@ -76,10 +76,10 @@ pub fn to_bytes(tnetstring: &TNetString) -> ~[u8] {
 }
 
 /// Serializes a TNetString value into a string.
-pub impl TNetString: to_str::ToStr {
-    fn to_str() -> ~str {
+impl to_str::ToStr for TNetString {
+    fn to_str(&self) -> ~str {
         do io::with_str_writer |wr| {
-            to_writer(wr, &self);
+            to_writer(wr, self);
         }
     }
 }
@@ -227,7 +227,7 @@ pub fn from_str(data: &str) -> (Option<TNetString>, ~str) {
 }
 
 /// Test the equality between two TNetString values
-pub impl TNetString: cmp::Eq {
+impl cmp::Eq for TNetString {
     fn eq(&self, other: &TNetString) -> bool {
         match (self, other) {
             (&Str(ref s0), &Str(ref s1)) => s0 == s1,
