@@ -147,7 +147,7 @@ pub fn from_reader(reader: io::Reader) -> Option<TNetString> {
         assert!(payload.len() == 0u);
         Some(Null)
       }
-      ',' => Some(Str(move payload)),
+      ',' => Some(Str(payload)),
       c => {
         let s = str::from_char(c);
         fail!(fmt!("Invalid payload type: %?", s))
@@ -161,27 +161,27 @@ fn parse_vec(data: &[u8]) -> ~[TNetString] {
     do io::with_bytes_reader(data) |reader| {
         let mut result = ~[];
 
-        match move from_reader(reader) {
-            Some(move value) => result.push(move value),
+        match from_reader(reader) {
+            Some(value) => result.push(value),
             None => fail!(~"invalid value")
         }
 
         while !reader.eof() {
-            match move from_reader(reader) {
-                Some(move value) => result.push(move value),
+            match from_reader(reader) {
+                Some(value) => result.push(value),
                 None => fail!(~"invalid TNetString")
             }
         }
 
-        move result
+        result
     }
 }
 
 fn parse_pair(reader: io::Reader) -> (~[u8], TNetString) {
     match from_reader(reader) {
-        Some(Str(move key)) => {
+        Some(Str(key)) => {
             match from_reader(reader) {
-                Some(move value) => (move key, move value),
+                Some(value) => (key, value),
                 None => fail!(~"invalid TNetString"),
             }
         }
@@ -196,23 +196,23 @@ fn parse_map(data: &[u8]) -> ~send_map::linear::LinearMap<~[u8], TNetString> {
     if data.len() != 0u {
         do io::with_bytes_reader(data) |reader| {
             let (key, value) = parse_pair(reader);
-            result.insert(move key, move value);
+            result.insert(key, value);
 
             while !reader.eof() {
                 let (key, value) = parse_pair(reader);
-                result.insert(move key, move value);
+                result.insert(key, value);
             }
         }
     }
 
-    move result
+    result
 }
 
 /// Deserializes a TNetString value from a byte string.
 pub fn from_bytes(data: &[u8]) -> (Option<TNetString>, ~[u8]) {
     do io::with_bytes_reader(data) |reader| {
         let tnetstring = from_reader(reader);
-        (move tnetstring, reader.read_whole_stream())
+        (tnetstring, reader.read_whole_stream())
     }
 }
 
@@ -221,7 +221,7 @@ pub fn from_str(data: &str) -> (Option<TNetString>, ~str) {
     do io::with_str_reader(data) |rdr| {
         let tnetstring = from_reader(rdr);
         let bytes = rdr.read_whole_stream();
-        (move tnetstring, str::from_bytes(bytes))
+        (tnetstring, str::from_bytes(bytes))
     }
 
 }
@@ -268,7 +268,7 @@ mod tests {
         assert!(actual.is_some());
         assert!(rest == ~"");
 
-        let actual = option::unwrap(move actual);
+        let actual = option::unwrap(actual);
         assert!(actual == *expected);
         assert!(expected.to_str() == *s);
     }
@@ -289,7 +289,7 @@ mod tests {
                     Str(str::to_bytes("\x00\x00\x00\x00"))]));
 
         test(&~"51:5:hello,39:11:12345678901#4:this,4:true!0:~4:\x00\x00\x00\
-               \x00,]}", &Map(move d));
+               \x00,]}", &Map(d));
 
         test(&~"5:12345#", &Int(12345));
         test(&~"12:this is cool,", &Str(str::to_bytes("this is cool")));
@@ -344,12 +344,12 @@ mod tests {
                     while i != 0u32 {
                         let s = rng.gen_bytes(randint(rng, 0u32, 100u32) as uint);
                         d.insert(
-                            move s,
-                            move get_random_object(rng, depth + 1u32)
+                            s,
+                            get_random_object(rng, depth + 1u32)
                         );
                         i -= 1u32;
                     }
-                    Map(move d)
+                    Map(d)
                 }
             } else {
                 match randint(rng, 0u32, 5u32) {
