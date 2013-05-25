@@ -18,7 +18,7 @@ pub enum TNetString {
     Vec(~[TNetString]),
 }
 
-pub type Map = ~core::hashmap::HashMap<~[u8], TNetString>;
+pub type Map = ~std::hashmap::HashMap<~[u8], TNetString>;
 
 /// Serializes a TNetString value into a io::Writer.
 pub fn to_writer(writer: @io::Writer, tnetstring: &TNetString) {
@@ -187,8 +187,8 @@ fn parse_pair(reader: @io::Reader) -> (~[u8], TNetString) {
     }
 }
 
-fn parse_map(data: &[u8]) -> ~core::hashmap::HashMap<~[u8], TNetString> {
-    let mut result = ~core::hashmap::HashMap::new();
+fn parse_map(data: &[u8]) -> ~std::hashmap::HashMap<~[u8], TNetString> {
+    let mut result = ~std::hashmap::HashMap::new();
 
     if data.len() != 0u {
         do io::with_bytes_reader(data) |reader| {
@@ -275,10 +275,10 @@ mod tests {
     #[test]
     fn test_format() {
         test(&~"11:hello world,", &Str(str::to_bytes("hello world")));
-        test(&~"0:}", &Map(~core::hashmap::HashMap()));
+        test(&~"0:}", &Map(~std::hashmap::HashMap()));
         test(&~"0:]", &Vec(~[]));
 
-        let mut d = ~core::hashmap::HashMap();
+        let mut d = ~std::hashmap::HashMap();
         d.insert(str::to_bytes("hello"),
                 Vec(~[
                     Int(12345678901),
@@ -337,7 +337,7 @@ mod tests {
                         get_random_object(rng, depth + 1u32)
                     ))
                 } else {
-                    let mut d = ~core::hashmap::HashMap();
+                    let mut d = ~std::hashmap::HashMap();
 
                     let mut i = randint(rng, 0u32, 10u32);
                     while i != 0u32 {
