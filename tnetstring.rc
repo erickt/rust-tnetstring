@@ -7,8 +7,6 @@
 
 extern mod std;
 
-use core::io::{ReaderUtil, WriterUtil};
-
 /// Represents a TNetString value.
 pub enum TNetString {
     Str(~[u8]),
