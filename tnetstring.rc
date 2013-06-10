@@ -5,7 +5,7 @@
 
 /// Rust TNetStrings serialization library.
 
-extern mod std;
+use std::{cmp, float, int, io, str, to_str};
 
 /// Represents a TNetString value.
 pub enum TNetString {
@@ -31,7 +31,7 @@ pub fn to_writer(writer: @io::Writer, tnetstring: &TNetString) {
     match tnetstring {
         &Str(ref s) => write_str(writer, *s),
         &Int(i) => {
-            let s = int::to_str(i);
+            let s = i.to_str();
             writer.write_str(fmt!("%u:%s#", s.len(), s));
         }
         &Float(f) => {
@@ -39,7 +39,7 @@ pub fn to_writer(writer: @io::Writer, tnetstring: &TNetString) {
             writer.write_str(fmt!("%u:%s^", s.len(), s));
         }
         &Bool(b) => {
-            let s = bool::to_str(b);
+            let s = b.to_str();
             writer.write_str(fmt!("%u:%s!", s.len(), s));
         }
         &Map(ref m) => {
@@ -249,7 +249,7 @@ impl cmp::Eq for TNetString {
                 }
             }
             (&Vec(ref v0), &Vec(ref v1)) => {
-                vec::all2(*v0, *v1, |x0, x1| x0 == x1)
+                v0.eq(v1)
             },
             _ => false
         }
