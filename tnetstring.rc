@@ -44,7 +44,7 @@ pub fn to_writer(writer: @io::Writer, tnetstring: &TNetString) {
         }
         &Map(ref m) => {
             let payload = do io::with_bytes_writer |wr| {
-                for m.each |key, value| {
+                for m.iter().advance |(key, value)| {
                     write_str(wr, *key);
                     to_writer(wr, value);
                 }
@@ -55,7 +55,7 @@ pub fn to_writer(writer: @io::Writer, tnetstring: &TNetString) {
         }
         &Vec(ref v) => {
             let payload = do io::with_bytes_writer |wr| {
-                for v.each |e| { to_writer(wr, e) }
+                for v.iter().advance |e| { to_writer(wr, e) }
             };
             writer.write_str(fmt!("%u:", payload.len()));
             writer.write(payload);
@@ -234,7 +234,7 @@ impl cmp::Eq for TNetString {
             (&Null, &Null) => true,
             (&Map(ref d0), &Map(ref d1)) => {
                 if d0.len() == d1.len() {
-                    for d0.each |k0, v0| {
+                    for d0.iter().advance |(k0, v0)| {
                         // XXX send_map::linear::LinearMap has find_ref, but
                         // that method is not available for HashMap.
                         let result = match d1.find(k0) {
