@@ -3,4 +3,7 @@
 *.so
 *.dll
 *.dSYM
-tnetstring
+/bin/
+/lib/
+/build/
+/.rust/
