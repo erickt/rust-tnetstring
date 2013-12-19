@@ -8,10 +8,9 @@
 use std::f64;
 use std::hashmap::HashMap;
 use std::io::Decorator;
-use std::io::mem::MemWriter;
+use std::io::mem::{MemWriter, BufReader};
 use std::num::strconv;
 use std::str;
-use std::vec;
 
 /// Represents a TNetString value.
 pub enum TNetString {
@@ -91,9 +90,9 @@ impl ToStr for TNetString {
     }
 }
 
-/// Deserializes a TNetString value from an Iterator<u8>.
-pub fn from_iter<T: Iterator<u8>>(iter: &mut T) -> Option<TNetString> {
-    let mut ch = match iter.next() {
+/// Deserializes a `TNetString` value from a `Reader`.
+pub fn from_reader<R: Reader + Buffer>(rdr: &mut R) -> Option<TNetString> {
+    let mut ch = match rdr.read_byte() {
         Some(ch) => ch,
         None => { return None; }
     };
@@ -104,15 +103,17 @@ pub fn from_iter<T: Iterator<u8>>(iter: &mut T) -> Option<TNetString> {
     if ch < '0' as u8 || ch > '9' as u8 {
         fail!("Not a TNetString: invalid or missing length prefix");
     } else if ch == '0' as u8 {
-        ch = match iter.next() {
+        ch = match rdr.read_byte() {
             Some(ch) => ch,
-            None => { fail!(); }
+            None => {
+                fail!("Not a TNetString: invalid or missing length prefix");
+            }
         };
     } else {
         loop {
             len = (10u * len) + ((ch as uint) - ('0' as uint));
 
-            ch = match iter.next() {
+            ch = match rdr.read_byte() {
                 Some(ch) => ch,
                 None => {
                     fail!("Not a TNetString: invalid or missing length prefix");
@@ -131,21 +132,20 @@ pub fn from_iter<T: Iterator<u8>>(iter: &mut T) -> Option<TNetString> {
     }
 
     // Read the data plus terminating type tag.
-    let mut payload = vec::with_capacity(len);
+    let payload = rdr.read_bytes(len);
 
-    for _ in range(0, len) {
-        match iter.next() {
-            Some(ch) => { payload.push(ch); }
-            None => { fail!("Not a TNetString: invalid length prefix"); }
-        }
+    if payload.len() != len {
+        fail!("Not a TNetString: invalid length prefix");
     }
 
-    ch = match iter.next() {
+    let ch = match rdr.read_char() {
         Some(ch) => ch,
-        None => { fail!("Not a TNetString: missing type tag"); }
+        None => {
+            fail!("Not a TNetString: missing type tag");
+        }
     };
 
-    match ch as char {
+    match ch {
         '#' => {
             let v = strconv::from_str_bytes_common(payload, 10, true, false, false,
                                                    strconv::ExpNone, false, false);
@@ -180,20 +180,20 @@ fn parse_vec(data: &[u8]) -> ~[TNetString] {
     if data.is_empty() { return ~[]; }
 
     let mut result = ~[];
-    let mut iter = data.iter().map(|x| *x);
+    let mut rdr = BufReader::new(data);
 
     loop {
-        match from_iter(&mut iter) {
+        match from_reader(&mut rdr) {
             Some(value) => { result.push(value); }
             None => { return result; }
         }
     }
 }
 
-fn parse_pair<T: Iterator<u8>>(iter: &mut T) -> Option<(~[u8], TNetString)> {
-    match from_iter(iter) {
+fn parse_pair<R: Reader + Buffer>(rdr: &mut R) -> Option<(~[u8], TNetString)> {
+    match from_reader(rdr) {
         Some(Str(key)) => {
-            match from_iter(iter) {
+            match from_reader(rdr) {
                 Some(value) => Some((key, value)),
                 None => fail!("invalid TNetString"),
             }
@@ -205,10 +205,10 @@ fn parse_pair<T: Iterator<u8>>(iter: &mut T) -> Option<(~[u8], TNetString)> {
 
 fn parse_map(data: &[u8]) -> ~HashMap<~[u8], TNetString> {
     let mut result = ~HashMap::new();
-    let mut iter = data.iter().map(|x| *x);
+    let mut rdr = BufReader::new(data);
 
     loop {
-        match parse_pair(&mut iter) {
+        match parse_pair(&mut rdr) {
             Some((key, value)) => { result.insert(key, value); }
             None => { return result; }
         }
@@ -216,16 +216,15 @@ fn parse_map(data: &[u8]) -> ~HashMap<~[u8], TNetString> {
 }
 
 /// Deserializes a TNetString value from a byte string.
-pub fn from_bytes(data: &[u8]) -> (Option<TNetString>, ~[u8]) {
-    let mut iter = data.iter().map(|x| *x);
-    let tnetstring = from_iter(&mut iter);
-    (tnetstring, FromIterator::from_iterator(&mut iter))
+pub fn from_bytes<'a>(data: &'a [u8]) -> (Option<TNetString>, BufReader<'a>) {
+    let mut rdr = BufReader::new(data);
+    let tnetstring = from_reader(&mut rdr);
+    (tnetstring, rdr)
 }
 
 /// Deserializes a TNetString value from a string.
-pub fn from_str(data: &str) -> (Option<TNetString>, ~str) {
-    let (tnetstring, bytes) = from_bytes(data.as_bytes());
-    (tnetstring, str::from_utf8_owned(bytes))
+pub fn from_str<'a>(data: &'a str) -> (Option<TNetString>, BufReader<'a>) {
+    from_bytes(data.as_bytes())
 }
 
 /// Test the equality between two TNetString values

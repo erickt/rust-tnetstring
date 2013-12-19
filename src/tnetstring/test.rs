@@ -14,9 +14,9 @@ use tnetstring::from_str;
 // Tests inspired by https://github.com/rfk/TNetString.
 
 fn test(s: &str, expected: &TNetString) {
-    let (actual, rest) = from_str(s);
+    let (actual, mut rest) = from_str(s);
     assert!(actual.is_some());
-    assert!(rest.is_empty());
+    assert!(rest.eof());
 
     let actual = actual.unwrap();
     assert_eq!(actual, *expected);
@@ -146,9 +146,10 @@ fn test_random() {
     let mut i = 500u;
     while i != 0u {
         let v0 = get_random_object(&mut rng, 0u32);
+        let bytes = to_bytes(&v0);
 
-        match from_bytes(to_bytes(&v0)) {
-            (Some(ref v1), ref rest) if *rest == ~[] => {
+        match from_bytes(bytes) {
+            (Some(ref v1), mut rest) if rest.eof() => {
                 assert!(v0 == *v1)
             },
             _ => fail!("invalid TNetString")
