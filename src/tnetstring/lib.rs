@@ -1,7 +1,4 @@
-#[link(name = "tnetstring",
-       vers = "0.3",
-       uuid = "ce93b70c-c22a-45fa-97a7-66ab97009005")];
-#[crate_type = "lib"];
+#[crate_id = "tnetstring#0.3"];
 
 /// Rust TNetStrings serialization library.
 
