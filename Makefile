@@ -1,11 +1,22 @@
-RUSTPKG ?= rustpkg
-RUST_FLAGS ?= -Z debug-info -O
+RUSTC ?= rustc
+RUST_FLAGS ?= -O
 
-all:
-	$(RUSTPKG) $(RUST_FLAGS) install tnetstring
+tnetstring_files = \
+									 src/tnetstring/lib.rs
 
-test:
-	$(RUSTPKG) test tnetstring
+all: tnetstring
+
+build:
+	mkdir -p build
+
+tnetstring: build $(tnetstring_files)
+	$(RUSTC) $(RUST_FLAGS) src/tnetstring/lib.rs --out-dir=build/
+
+build/tests: build $(tnetstring_files)
+	$(RUSTC) $(RUST_FLAGS) --test src/tnetstring/lib.rs -o build/tests
+
+check: build/tests
+	./build/tests --test
 
 clean:
 	rm -rf bin build lib
