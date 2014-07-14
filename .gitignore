@@ -3,7 +3,4 @@
 *.so
 *.dll
 *.dSYM
-/bin/
-/lib/
-/build/
-/.rust/
+/target/
