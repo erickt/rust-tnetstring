@@ -1,5 +1,5 @@
 [package]
-name = "rust-tnetstring"
+name = "tnetstring"
 version = "0.3.0"
 authors = ["erick.tryzelaar@gmail.com"]
 
