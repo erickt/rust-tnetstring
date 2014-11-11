@@ -4,3 +4,4 @@
 *.dll
 *.dSYM
 /target/
+/Cargo.lock
