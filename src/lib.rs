@@ -11,9 +11,12 @@ use std::f64;
 use std::fmt;
 use std::io;
 use std::num::strconv;
+use std::str;
+use std::vec;
 
 pub enum Error {
     MissingLengthPrefix,
+    InvalidString,
     InvalidInteger,
     InvalidBool,
     InvalidFloat,
@@ -29,6 +32,9 @@ impl fmt::Show for Error {
         match *self {
             MissingLengthPrefix => {
                 write!(f, "missing length prefix")
+            }
+            InvalidString => {
+                write!(f, "invalid string")
             }
             InvalidInteger => {
                 write!(f, "invalid integer")
@@ -60,13 +66,13 @@ impl fmt::Show for Error {
 
 /// Represents a TNetString value.
 pub enum TNetString {
-    Str(Vec<u8>),
+    Str(vec::Vec<u8>),
     Int(int),
     Float(f64),
     Bool(bool),
     Null,
-    Map(HashMap<Vec<u8>, TNetString>),
-    Vec(Vec<TNetString>),
+    Map(HashMap<vec::Vec<u8>, TNetString>),
+    Vec(vec::Vec<TNetString>),
 }
 
 /// Serializes a TNetString value into a `Writer`.
@@ -122,7 +128,7 @@ pub fn to_writer(writer: &mut Writer, tnetstring: &TNetString) -> io::IoResult<(
 }
 
 /// Serializes a TNetString value into a byte string.
-pub fn to_bytes(tnetstring: &TNetString) -> io::IoResult<Vec<u8>> {
+pub fn to_bytes(tnetstring: &TNetString) -> io::IoResult<vec::Vec<u8>> {
     let mut wr = io::MemWriter::new();
     try!(to_writer(&mut wr as &mut Writer, tnetstring));
     Ok(wr.unwrap())
@@ -190,18 +196,12 @@ pub fn from_reader<R: Reader + Buffer>(rdr: &mut R) -> Result<Option<TNetString>
 
     let value = match ch {
         b'#' => {
-            let v = strconv::from_str_bytes_common(
-                payload.as_slice(),
-                10,
-                true,
-                false,
-                false,
-                strconv::ExpNone,
-                false,
-                false
-            );
+            let payload = match str::from_utf8(payload.as_slice()) {
+                Some(payload) => payload,
+                None => { return Err(InvalidString); }
+            };
 
-            match v {
+            match strconv::from_str_radix_int(payload, 10) {
                 Some(v) => Some(Int(v)),
                 None => { return Err(InvalidInteger); }
             }
@@ -216,18 +216,12 @@ pub fn from_reader<R: Reader + Buffer>(rdr: &mut R) -> Result<Option<TNetString>
             }
         }
         b'^' => {
-            let v = strconv::from_str_bytes_common(
-                payload.as_slice(),
-                10u,
-                true,
-                true,
-                true,
-                strconv::ExpDec,
-                false,
-                false
-            );
+            let payload = match str::from_utf8(payload.as_slice()) {
+                Some(payload) => payload,
+                None => { return Err(InvalidString); }
+            };
 
-            match v {
+            match strconv::from_str_radix_float(payload, 10) {
                 Some(v) => Some(Float(v)),
                 None => { return Err(InvalidFloat); }
             }
@@ -250,7 +244,7 @@ pub fn from_reader<R: Reader + Buffer>(rdr: &mut R) -> Result<Option<TNetString>
     Ok(value)
 }
 
-fn parse_vec(data: &[u8]) -> Result<Vec<TNetString>, Error> {
+fn parse_vec(data: &[u8]) -> Result<vec::Vec<TNetString>, Error> {
     if data.is_empty() { return Ok(vec![]); }
 
     let mut result = vec![];
@@ -264,7 +258,7 @@ fn parse_vec(data: &[u8]) -> Result<Vec<TNetString>, Error> {
     }
 }
 
-fn parse_pair<R: Reader + Buffer>(rdr: &mut R) -> Result<Option<(Vec<u8>, TNetString)>, Error> {
+fn parse_pair<R: Reader + Buffer>(rdr: &mut R) -> Result<Option<(vec::Vec<u8>, TNetString)>, Error> {
     match try!(from_reader(rdr)) {
         Some(Str(key)) => {
             match try!(from_reader(rdr)) {
@@ -277,7 +271,7 @@ fn parse_pair<R: Reader + Buffer>(rdr: &mut R) -> Result<Option<(Vec<u8>, TNetSt
     }
 }
 
-fn parse_map(data: &[u8]) -> Result<HashMap<Vec<u8>, TNetString>, Error> {
+fn parse_map(data: &[u8]) -> Result<HashMap<vec::Vec<u8>, TNetString>, Error> {
     let mut result = HashMap::new();
     let mut rdr = io::BufReader::new(data);
 
@@ -315,7 +309,7 @@ impl PartialEq for TNetString {
                     for (k0, v0) in d0.iter() {
                         // XXX send_map::linear::LinearMap has find_ref, but
                         // that method is not available for HashMap.
-                        let result = match d1.find(k0) {
+                        let result = match d1.get(k0) {
                             Some(v1) => v0 == v1,
                             None => false,
                         };
@@ -343,9 +337,10 @@ mod tests {
     use std::from_str::FromStr;
     use std::rand::Rng;
     use std::rand;
+    use std::vec;
 
     use super::TNetString;
-    use super::{Str, Int, Float, Bool, Null, Map, Vec};
+    use super::{Int, Float, Bool, Null, Map, Vec};
     use super::{from_bytes, to_bytes};
     use super::from_str;
 
@@ -363,36 +358,36 @@ mod tests {
 
     #[test]
     fn test_format() {
-        test("11:hello world,", &Str(b"hello world".to_owned()));
+        test("11:hello world,", &super::Str(b"hello world".to_vec()));
         test("0:}", &Map(HashMap::new()));
         test("0:]", &Vec(vec![]));
 
         let mut d = HashMap::new();
-        d.insert(b"hello".to_owned(),
+        d.insert(b"hello".to_vec(),
                 Vec(vec![
                     Int(12345678901),
-                    Str(b"this".to_owned()),
+                    super::Str(b"this".to_vec()),
                     Bool(true),
                     Null,
-                    Str(b"\x00\x00\x00\x00".to_owned())
+                    super::Str(b"\x00\x00\x00\x00".to_vec())
                 ]));
 
         test("51:5:hello,39:11:12345678901#4:this,4:true!0:~4:\x00\x00\x00\
                \x00,]}", &Map(d));
 
         test("5:12345#", &Int(12345));
-        test("12:this is cool,", &Str(b"this is cool".to_owned()));
-        test("0:,", &Str(b"".to_owned()));
+        test("12:this is cool,", &super::Str(b"this is cool".to_vec()));
+        test("0:,", &super::Str(b"".to_vec()));
         test("0:~", &Null);
         test("4:true!", &Bool(true));
         test("5:false!", &Bool(false));
         test("10:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,",
-            &Str(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00".to_owned()));
+            &super::Str(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00".to_vec()));
         test("24:5:12345#5:67890#5:xxxxx,]",
             &Vec(vec![
                 Int(12345),
                 Int(67890),
-                Str(b"xxxxx".to_owned())]));
+                super::Str(b"xxxxx".to_vec())]));
         test("18:3:0.1^3:0.2^3:0.4^]",
            &Vec(vec![Float(0.1), Float(0.2), Float(0.4)]));
         test("243:238:233:228:223:218:213:208:203:198:193:188:183:178:173:\
@@ -408,7 +403,7 @@ mod tests {
                 vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(
                 vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(vec![Vec(
                 vec![Vec(vec![Vec(vec![
-                    Str(b"hello-there".to_owned())
+                    super::Str(b"hello-there".to_vec())
                 ])])])])])])])])])])])])])])])])])])])])])])])])])])])])
                 ])])])])])])])])])])])])])])])])])])])])])])]));
     }
@@ -419,7 +414,7 @@ mod tests {
             if rng.gen_range(depth, 10u32) <= 4u32 {
                 if rng.gen_range(0u32, 1u32) == 0u32 {
                     let n = rng.gen_range(0u32, 10u32);
-                    Vec(Vec::from_fn(n as uint, |_i|
+                    Vec(vec::Vec::from_fn(n as uint, |_i|
                         get_random_object(rng, depth + 1u32)
                     ))
                 } else {
@@ -454,7 +449,7 @@ mod tests {
                             if f == f1 { break; }
                             f = f1;
                           }
-                          None => fail!("invalid float")
+                          None => panic!("invalid float")
                         }
                     }
 
@@ -466,9 +461,9 @@ mod tests {
                   }
                   5u32 => {
                     let n = rng.gen_range(0u32, 100u32) as uint;
-                    Str(rng.gen_iter::<u8>().take(n).collect())
+                    super::Str(rng.gen_iter::<u8>().take(n).collect())
                   }
-                  _ => fail!()
+                  _ => panic!()
                 }
             }
         }
@@ -484,7 +479,7 @@ mod tests {
                 (Some(ref v1), rest) if rest.eof() => {
                     assert!(v0 == *v1)
                 },
-                _ => fail!("invalid TNetString")
+                _ => panic!("invalid TNetString")
             }
             i -= 1u;
         }

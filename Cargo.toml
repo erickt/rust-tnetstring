@@ -1,8 +1,7 @@
 [package]
 name = "tnetstring"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["erick.tryzelaar@gmail.com"]
 
-[[lib]]
+[lib]
 name = "tnetstring"
-path = "src/tnetstring/lib.rs"
